@@ -1,0 +1,9 @@
+services:
+    postgres:
+        image: postgres:16
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: pass
+            POSTGRES_DB: igaming
+        ports:
+            - "5433:5432"
