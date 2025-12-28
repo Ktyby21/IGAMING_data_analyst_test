@@ -63,7 +63,7 @@ SELECT
     ROUND((1.0 * sdd.days_dep / u.user_count), 5) as conversion_7_days
 FROM count_users u
 LEFT JOIN count_7_days_dep sdd
-ON u.source = sdd.source
+ON u.source = sdd.source;
 
 -- 13) Payer conversion по дням: доля DAU, которые сделали purchase в тот же день.
 
@@ -279,4 +279,71 @@ SELECT
 FROM user_with_dates;
 
 -- 19.	Rolling 7d: 7-дневный rolling sum sessions.revenue по дням (на уровне всей платформы).
+WITH bounds AS(
+    SELECT
+        MAX(DATE(session_start)) AS max_date,
+        MIN(DATE(session_start)) AS min_date
+    FROM
+        sessions),
+
+dates AS (
+    SELECT
+        generate_series(bounds.min_date, bounds.max_date, INTERVAL '1 day')::date AS revenue_day
+    FROM bounds
+    ORDER BY revenue_day),
+
+daily_revenue AS(
+    SELECT
+        SUM(revenue) AS revenue,
+        session_start::date AS session_date
+    FROM sessions
+    GROUP BY session_start::date)
+
+SELECT
+    d.revenue_day,
+    SUM(COALESCE(dr.revenue,0)) OVER (ORDER BY revenue_day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+FROM dates d
+LEFT JOIN daily_revenue dr
+ON d.revenue_day = dr.session_date
+ORDER BY d.revenue_day;
+
 -- 20.	Rolling 7d по пользователю: 7-дневная сумма purchase amount по каждому user_id (оконка).
+WITH bounds AS(
+    SELECT
+        user_id,
+        MAX(event_time::date) AS max_date,
+        MIN(event_time::date) AS min_date
+    FROM events
+    WHERE event_type = 'purchase'
+    GROUP BY user_id),
+dates AS(
+    SELECT
+        b.user_id,
+        gs::date AS purchase_day
+    FROM bounds b
+    CROSS JOIN LATERAL generate_series(b.min_date,b.max_date,INTERVAL '1 day') AS gs),
+
+user_amount AS(
+    SELECT
+        user_id,
+        SUM(amount) AS amount,
+        event_time::date AS event_date
+    FROM events
+    WHERE event_type = 'purchase'
+    GROUP BY user_id, event_time::date),
+
+user_amount_by_all_dates AS(
+    SELECT
+        d.user_id,
+        d.purchase_day,
+        COALESCE(ua.amount,0) AS amount
+    FROM dates d
+    LEFT JOIN user_amount ua
+    ON d.user_id = ua.user_id AND d.purchase_day = ua.event_date
+    ORDER BY d.purchase_day, d.user_id)
+
+SELECT
+    user_id,
+    purchase_day,
+    SUM(COALESCE(amount,0)) OVER (PARTITION BY user_id ORDER BY purchase_day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+FROM user_amount_by_all_dates;
