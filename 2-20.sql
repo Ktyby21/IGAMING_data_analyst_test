@@ -149,7 +149,8 @@ ORDER BY a.date_event;
 -- 16) Cohort retention: D1/D7/D30 по когорте регистрации (по registration_date).
 
 WITH session_date AS(
-    SELECT user_id,
+    SELECT 
+        user_id,
         DATE(session_start) as session_date
     FROM sessions
 ),
