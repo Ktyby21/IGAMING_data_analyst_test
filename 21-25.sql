@@ -91,4 +91,22 @@ GROUP BY registration_date
 ORDER BY registration_date
 
 -- 24.	“Кто отвалился”: пользователи с 0 сессий за последние 14 дней, но были активны раньше (верни список + их last_session_date).
+WITH 
+last_users_session AS (
+    SELECT
+        MAX(session_start::date) AS last_session,
+        user_id
+    FROM sessions
+    GROUP BY user_id)
+
+SELECT
+    user_id,
+    last_session
+FROM last_users_session
+WHERE last_session + INTERVAL '14 days' < (
+    SELECT
+        MAX(DATE(session_start)) AS max_date
+    FROM
+        sessions)
+ORDER BY user_id
 -- 25.	Оптимизация: взять любой тяжёлый запрос (например DAU/Retention) и прикинуть, какие индексы нужны и почему (по колонкам WHERE/JOIN/ORDER).

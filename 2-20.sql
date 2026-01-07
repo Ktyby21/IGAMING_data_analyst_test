@@ -322,7 +322,7 @@ dates AS(
         b.user_id,
         gs::date AS purchase_day
     FROM bounds b
-    CROSS JOIN LATERAL generate_series(b.min_date,b.max_date,INTERVAL '1 day') AS gs),
+    CROSS JOIN LATERAL generate_series(b.min_date,b.boun_date,INTERVAL '1 day') AS gs),
 
 user_amount AS(
     SELECT
